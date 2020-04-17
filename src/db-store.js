@@ -1,5 +1,6 @@
 import Vue from 'vue';
 import API from 'db-api';
+import { User } from 'models';
 
 export default {
   state: {
@@ -25,7 +26,7 @@ export default {
   },
   mutations: {
     SET_USER: (state, user) => {
-      state.user = user;
+      state.user = new User(user);
     },
     SET_ROWS_LIMIT: (state, rowsLimit) => {
       state.rowsLimit = rowsLimit;
