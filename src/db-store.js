@@ -8,7 +8,6 @@ export default {
     user: {},
     rowsLimit: 1000,
     dicts: {},
-    modelsRelations: {},
     packageProductName: JSON.parse(unescape(process.env.PACKAGE_JSON)).productName,
     packageVersion: JSON.parse(unescape(process.env.PACKAGE_JSON)).version,
     packageAuthor: JSON.parse(unescape(process.env.PACKAGE_JSON)).author,
@@ -19,7 +18,6 @@ export default {
     ROWS_LIMIT: (state) => state.rowsLimit,
     DICTS: (state) => state.dicts,
     DICT: (state, getters) => (dictName) => getters.DICTS[dictName] || [],
-    MODELS_RELATIONS: (state) => state.modelsRelations,
     PACKAGE_PRODUCT_NAME: (state) => state.packageProductName,
     PACKAGE_VERSION: (state) => state.packageVersion,
     PACKAGE_AUTHOR: (state) => state.packageAuthor,
@@ -38,9 +36,6 @@ export default {
     SET_DICT: (state, dict) => {
       Vue.set(state.dicts, dict.name, Object.freeze(dict.node));
     },
-    SET_MODELS_RELATIONS: (state, modelsRelations) => {
-      state.modelsRelations = modelsRelations;
-    },
     SET_PROPS(state, prop, val) {
       Vue.set(state, prop, val);
     }
@@ -49,16 +44,32 @@ export default {
 
     // SETTERS
 
-    SET_USER: (ctx, user) => {
-      ctx.commit('SET_USER', user);
+    SET_USER: async (ctx, user) => {
+      ctx.commit('SET_USER', await API.router.getUser());
     },
-    SET_ROWS_LIMIT: (ctx, rowsLimit) => {
-      ctx.commit('SET_ROWS_LIMIT', rowsLimit);
+    SET_ROWS_LIMIT: async (ctx, rowsLimit) => {
+      ctx.commit('SET_ROWS_LIMIT', await API.router.getMaxRows());
     },
-    SET_DICTS: (ctx, dicts) => {
-      Object.assign(dicts, ctx.rootState.dicts); // merge app dicts also
+    SET_DICTS: async (ctx, dicts) => {
+
+      Object.assign(dicts, ctx.rootState.dicts);
+
+      localforage.config({
+        name: 'IPNPDB',
+        version: 10,
+        storeName: 'dictionaries'
+      });
+
       for (const dictName in dicts) {
-        ctx.commit('SET_DICT', {name: dictName, node: dicts[dictName]})
+
+        let dict = await localforage.getItem(dictName);
+        if (dict === null) {
+          dict = await API.dict.total(dictName);
+          await localforage.setItem(dictName, {...dict.meta, node: dict.node});
+        } else {
+          //TODO: review dict async parallel...
+        }
+        ctx.commit('SET_DICT', {name: dictName, node: dict.node});
       }
     },
     SET_DICT: (ctx, dict) => {
@@ -70,42 +81,32 @@ export default {
 
     // GETTERS
 
-    GET_USER: async (ctx) => {
-      ctx.commit('SET_USER', await API.router.getUser());
-    },
-    GET_ROWS_LIMIT: async (ctx) => {
-      ctx.commit('SET_ROWS_LIMIT', await API.router.getMaxRows());
-    },
+    /*LOAD_DICTS: async (ctx, lang) => {
+     const dicts = await API.dict.dicts(Object.keys(ctx.getters.DICTS), lang);
 
-    GET_DICTS: async (ctx, lang) => {
-      const dicts = await API.dict.dicts(Object.keys(ctx.getters.DICTS), lang);
+     localforage.config({
+     name: 'IPNPDB',
+     version: 10,
+     storeName: 'dictionaries'
+     });
 
-      localforage.config({
-        name: 'IPNPDB',
-        version: 10,
-        storeName: 'dictionaries'
-      });
+     for (const dictName in dicts) {
+     ctx.commit('SET_DICT', {name: dictName, node: dicts[dictName].node});
+     await localforage.setItem(dictName, {
+     ...dicts[dictName].meta,
+     node: dicts[dictName].node
+     });
+     }
+     },
 
-      for (const dictName in dicts) {
-        ctx.commit('SET_DICT', {name: dictName, node: dicts[dictName].node});
-        await localforage.setItem(`${dicts[dictName].meta.name},${dicts[dictName].meta.language}`, {
-          ...dicts[dictName].meta,
-          node: dicts[dictName].node
-        });
-      }
-    },
+     LOAD_DICT: async (ctx, dictName) => {
+     const dict = await API.dict.total(dictName);
+     ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+     await localforage.setItem(dictName, {
+     ...dict.meta,
+     node: dict.node
+     });
 
-    GET_DICT: async (ctx, dictName) => {
-      const dict = await API.dict.total(dictName);
-      ctx.commit('SET_DICT', {name: dictName, node: dict.node});
-      await localforage.setItem(`${dict.meta.name},${dict.meta.language}`, {
-        ...dict.meta,
-        node: dict.node
-      });
-
-    },
-    GET_MODELS_RELATIONS: async (ctx) => {
-      ctx.commit('SET_MODELS_RELATIONS', await API.router.getModelsRelations());
-    }
+     } */
   }
 };
