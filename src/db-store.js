@@ -1,6 +1,7 @@
 import Vue from 'vue';
 import API from 'db-api';
 import { User } from 'models';
+import localforage from 'localforage';
 
 export default {
   state: {
@@ -75,15 +76,33 @@ export default {
     GET_ROWS_LIMIT: async (ctx) => {
       ctx.commit('SET_ROWS_LIMIT', await API.router.getMaxRows());
     },
+
     GET_DICTS: async (ctx, lang) => {
       const dicts = await API.dict.dicts(Object.keys(ctx.getters.DICTS), lang);
+
+      localforage.config({
+        name: 'IPNPDB',
+        version: 10,
+        storeName: 'dictionaries'
+      });
+
       for (const dictName in dicts) {
         ctx.commit('SET_DICT', {name: dictName, node: dicts[dictName].node});
+        await localforage.setItem(`${dicts[dictName].meta.name},${dicts[dictName].meta.language}`, {
+          ...dicts[dictName].meta,
+          node: dicts[dictName].node
+        });
       }
     },
+
     GET_DICT: async (ctx, dictName) => {
       const dict = await API.dict.total(dictName);
       ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+      await localforage.setItem(`${dict.meta.name},${dict.meta.language}`, {
+        ...dict.meta,
+        node: dict.node
+      });
+
     },
     GET_MODELS_RELATIONS: async (ctx) => {
       ctx.commit('SET_MODELS_RELATIONS', await API.router.getModelsRelations());
