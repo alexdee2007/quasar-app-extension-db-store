@@ -3,6 +3,12 @@ import API from 'db-api';
 import { User } from 'models';
 import localforage from 'localforage';
 
+localforage.config({
+  name: 'IPNPDB',
+  version: 10,
+  storeName: 'dictionaries'
+});
+
 export default {
   state: {
     user: {},
@@ -41,9 +47,6 @@ export default {
     }
   },
   actions: {
-
-    // SETTERS
-
     SET_USER: async (ctx, user) => {
       ctx.commit('SET_USER', await API.router.getUser());
     },
@@ -51,62 +54,18 @@ export default {
       ctx.commit('SET_ROWS_LIMIT', await API.router.getMaxRows());
     },
     SET_DICTS: async (ctx, dicts) => {
-
       Object.assign(dicts, ctx.rootState.dicts);
-
-      localforage.config({
-        name: 'IPNPDB',
-        version: 10,
-        storeName: 'dictionaries'
-      });
-
-      for (const dictName in dicts) {
-
-        let dict = await localforage.getItem(dictName);
-        if (dict === null) {
-          dict = await API.dict.total(dictName);
-          await localforage.setItem(dictName, {...dict.meta, node: dict.node});
-        } else {
-          //TODO: review dict async parallel...
-        }
-        ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+      await Promise.all(Object.keys(dicts).map(dictName => ctx.dispatch('SET_DICT', dictName)));
+    },
+    SET_DICT: async (ctx, dictName) => {
+      let dict = await localforage.getItem(dictName);
+      if (dict === null) {
+        dict = await API.dict.total(dictName);
+        await localforage.setItem(dictName, {...dict.meta, node: dict.node});
+      } else {
+        //TODO: review dict async parallel...
       }
-    },
-    SET_DICT: (ctx, dict) => {
-      ctx.commit('SET_DICT', dict);
-    },
-    SET_PROPS: (ctx, payload) => {
-      ctx.commit('SET_PROPS', payload.prop, payload.val);
-    },
-
-    // GETTERS
-
-    /*LOAD_DICTS: async (ctx, lang) => {
-     const dicts = await API.dict.dicts(Object.keys(ctx.getters.DICTS), lang);
-
-     localforage.config({
-     name: 'IPNPDB',
-     version: 10,
-     storeName: 'dictionaries'
-     });
-
-     for (const dictName in dicts) {
-     ctx.commit('SET_DICT', {name: dictName, node: dicts[dictName].node});
-     await localforage.setItem(dictName, {
-     ...dicts[dictName].meta,
-     node: dicts[dictName].node
-     });
-     }
-     },
-
-     LOAD_DICT: async (ctx, dictName) => {
-     const dict = await API.dict.total(dictName);
-     ctx.commit('SET_DICT', {name: dictName, node: dict.node});
-     await localforage.setItem(dictName, {
-     ...dict.meta,
-     node: dict.node
-     });
-
-     } */
+      ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+    }
   }
 };
