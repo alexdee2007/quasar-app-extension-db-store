@@ -42,30 +42,45 @@ export default {
     SET_DICT: (state, dict) => {
       Vue.set(state.dicts, dict.name, Object.freeze(dict.node));
     },
-    SET_PROPS(state, prop, val) {
+    SET_PROPS(state, prop, val) { // helper
       Vue.set(state, prop, val);
     }
   },
   actions: {
-    SET_USER: async (ctx, user) => {
+
+    fetchUser: async (ctx, user) => {
       ctx.commit('SET_USER', await API.router.getUser());
     },
-    SET_ROWS_LIMIT: async (ctx, rowsLimit) => {
+
+    fetchRowsLimit: async (ctx, rowsLimit) => {
       ctx.commit('SET_ROWS_LIMIT', await API.router.getMaxRows());
     },
-    SET_DICTS: async (ctx, dicts) => {
+
+    fetchDicts: async (ctx, dicts) => {
       Object.assign(dicts, ctx.rootState.dicts);
-      await Promise.all(Object.keys(dicts).map(dictName => ctx.dispatch('SET_DICT', dictName)));
+      await Promise.all(Object.keys(dicts).map(dictName => ctx.dispatch('fetchDict', dictName)));
     },
-    SET_DICT: async (ctx, dictName) => {
-      let dict = await localforage.getItem(dictName);
+
+    fetchDict: async (ctx, dictName) => {
+      let dict = await localforage.getItem(dictName); // fetch from storage
       if (dict === null) {
-        dict = await API.dict.total(dictName);
+        const [name, language = 'UK'] = dictName.split(',');
+        dict = await API.dict.total(name, language);
         await localforage.setItem(dictName, {...dict.meta, node: dict.node});
+        ctx.commit('SET_DICT', {name: dictName, node: dict.node});
       } else {
-        //TODO: review dict async parallel...
+        ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+        ctx.dispatch('reviewDict', {dictName, dict});
       }
-      ctx.commit('SET_DICT', {name: dictName, node: dict.node});
+    },
+
+    reviewDict: async(ctx, {dictName, dict}) => {
+      const reviewData = await API.dict.review(dict.name, dict.language, dict.hash); // review dict
+      if (reviewData.hash !== dict.hash) {
+        await localforage.setItem(dictName, {...reviewData.meta, node: reviewData.node});
+        ctx.commit('SET_DICT', {name: dictName, node: reviewData.node});
+      }
     }
   }
+
 };
