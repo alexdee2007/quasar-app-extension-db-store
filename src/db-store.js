@@ -1,13 +1,10 @@
 import Vue from 'vue';
 import API from 'db-api';
 import { User } from 'models';
-import localforage from 'localforage';
+import Dexie from 'dexie';
 
-localforage.config({
-  name: 'IPNPDB',
-  version: 10,
-  storeName: 'dictionaries'
-});
+const db = new Dexie('IPNPDB');
+db.version(1).stores({dictionaries: '[name+language]'});
 
 export default {
   state: {
@@ -62,11 +59,13 @@ export default {
     },
 
     fetchDict: async (ctx, dictName) => {
-      let dict = await localforage.getItem(dictName); // fetch from storage
-      if (dict === null) {
-        const [name, language = 'UK'] = dictName.split(',');
+
+      const [name, language = 'UK'] = dictName.split(',');
+
+      let dict = await db.dictionaries.get({name, language}); // fetch from storage
+      if (!dict) {
         dict = await API.dict.total(name, language);
-        await localforage.setItem(dictName, {...dict.meta, node: dict.node});
+        await db.dictionaries.put({...dict.meta, node: dict.node});
         ctx.commit('SET_DICT', {name: dictName, node: dict.node});
       } else {
         ctx.commit('SET_DICT', {name: dictName, node: dict.node});
@@ -77,9 +76,9 @@ export default {
     reviewDict: async(ctx, {dictName, dict}) => {
       const reviewData = await API.dict.review(dict.name, dict.language, dict.hash); // review dict
       if (reviewData.hash !== dict.hash) {
-        await localforage.setItem(dictName, {...reviewData.meta, node: reviewData.node});
+        await db.dictionaries.put({...reviewData.meta, node: reviewData.node});
         ctx.commit('SET_DICT', {name: dictName, node: reviewData.node});
-      }
+    }
     }
   }
 
