@@ -1,10 +1,7 @@
 import Vue from 'vue';
 import API from 'db-api';
 import { User } from 'models';
-import Dexie from 'dexie';
-
-const db = new Dexie('IPNPDB');
-db.version(1).stores({dictionaries: '[name+language]'});
+import db from './db-dictionaries';
 
 export default {
   state: {

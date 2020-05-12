@@ -1,6 +1,6 @@
 {
   "name": "quasar-app-extension-db-store",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Quasar App Extension which injects Vuex module",
   "author": "Razvan Stoenescu <razvan.stoenescu@gmail.com>",
   "license": "MIT",
